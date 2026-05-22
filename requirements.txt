@@ -1,0 +1,9 @@
+streamlit
+pandas
+openpyxl
+xlrd
+anthropic
+reportlab
+plotly
+Pillow
+schedule

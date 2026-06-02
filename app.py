@@ -175,14 +175,21 @@ if not st.session_state["connecte"]:
                     st.warning("Remplis tous les champs")
 
         else:
+            # Code d'invitation valides — ajoute ou supprime des codes ici
+            CODES_VALIDES = ["KOLO2026", "BETA30", "KOLOMAI"]
+
             nom_entreprise = st.text_input("Nom de votre entreprise", placeholder="Ma Societe SAS", key="reg_entreprise")
             email          = st.text_input("Email", placeholder="toi@exemple.fr", key="reg_email")
             mdp            = st.text_input("Mot de passe", type="password", key="reg_mdp")
             mdp2           = st.text_input("Confirmer le mot de passe", type="password", key="reg_mdp2")
+            code           = st.text_input("Code d'invitation", placeholder="Ex: KOLO2026", key="reg_code")
+            st.caption("Vous n'avez pas de code ? Contactez-nous sur LinkedIn.")
 
             if st.button("Creer mon compte", use_container_width=True):
-                if all([nom_entreprise, email, mdp, mdp2]):
-                    if mdp != mdp2:
+                if all([nom_entreprise, email, mdp, mdp2, code]):
+                    if code.strip().upper() not in CODES_VALIDES:
+                        st.error("Code d'invitation invalide. Contactez-nous pour en obtenir un.")
+                    elif mdp != mdp2:
                         st.error("Les mots de passe ne correspondent pas")
                     elif len(mdp) < 6:
                         st.error("Le mot de passe doit faire au moins 6 caracteres")
@@ -196,7 +203,7 @@ if not st.session_state["connecte"]:
                         else:
                             st.error(f"Erreur : {result.get('erreur', 'Inconnue')}")
                 else:
-                    st.warning("Remplis tous les champs")
+                    st.warning("Remplis tous les champs including le code d'invitation")
 
     st.markdown("""
     <div style="text-align:center;padding:2rem 0 1rem;color:#D1D5DB;font-size:0.78rem;">

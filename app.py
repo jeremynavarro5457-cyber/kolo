@@ -231,23 +231,52 @@ else:
             "Montant", "Jours Retard", "Niveau", "Email Client", "Statut Envoi"
         ])
 
+    def charger_historique() -> pd.DataFrame:
+        """Charge l'historique depuis Supabase pour cet utilisateur."""
+        try:
+            url = f"{SUPABASE_URL}/rest/v1/historique?user_email=eq.{utilisateur['email']}&order=date_envoi.desc"
+            r = httpx.get(url, headers=supabase_headers())
+            if r.status_code == 200 and len(r.json()) > 0:
+                df = pd.DataFrame(r.json())
+                df = df.rename(columns={
+                    "date_envoi":      "Date Envoi",
+                    "numero_facture":  "Numero Facture",
+                    "client":          "Client",
+                    "montant":         "Montant",
+                    "jours_retard":    "Jours Retard",
+                    "niveau":          "Niveau",
+                    "email_client":    "Email Client",
+                    "statut_envoi":    "Statut Envoi",
+                })
+                cols = ["Date Envoi","Numero Facture","Client","Montant","Jours Retard","Niveau","Email Client","Statut Envoi"]
+                return df[[c for c in cols if c in df.columns]]
+            return pd.DataFrame(columns=["Date Envoi","Numero Facture","Client","Montant","Jours Retard","Niveau","Email Client","Statut Envoi"])
+        except Exception as e:
+            st.error(f"Erreur chargement historique : {e}")
+            return pd.DataFrame(columns=["Date Envoi","Numero Facture","Client","Montant","Jours Retard","Niveau","Email Client","Statut Envoi"])
+
     def sauvegarder_historique(df: pd.DataFrame):
-        df.to_excel(HISTORIQUE_FILE, index=False)
+        """Inutile avec Supabase - on sauvegarde ligne par ligne."""
+        pass
 
     def ajouter_historique(row: pd.Series, niveau: int, statut: str):
-        df_hist = charger_historique()
-        nouvelle_ligne = {
-            "Date Envoi":     date.today().strftime("%d/%m/%Y"),
-            "Numero Facture": row.get("Numero Facture", "N/A"),
-            "Client":         row.get("Client", "N/A"),
-            "Montant":        row.get("Montant", 0),
-            "Jours Retard":   row.get("Jours Retard", 0),
-            "Niveau":         f"Niveau {niveau}",
-            "Email Client":   row.get("Email Client", "N/A"),
-            "Statut Envoi":   statut,
-        }
-        df_hist = pd.concat([df_hist, pd.DataFrame([nouvelle_ligne])], ignore_index=True)
-        sauvegarder_historique(df_hist)
+        """Ajoute une ligne dans Supabase."""
+        try:
+            url = f"{SUPABASE_URL}/rest/v1/historique"
+            data = {
+                "user_email":     utilisateur["email"],
+                "date_envoi":     date.today().strftime("%d/%m/%Y"),
+                "numero_facture": str(row.get("Numero Facture", "N/A")),
+                "client":         str(row.get("Client", "N/A")),
+                "montant":        float(row.get("Montant", 0)),
+                "jours_retard":   int(row.get("Jours Retard", 0)),
+                "niveau":         f"Niveau {niveau}",
+                "email_client":   str(row.get("Email Client", "N/A")),
+                "statut_envoi":   statut,
+            }
+            httpx.post(url, headers=supabase_headers(), json=data)
+        except Exception as e:
+            st.error(f"Erreur sauvegarde historique : {e}")
 
     def get_categorie(montant: float) -> str:
         if montant < 1000:   return "petit"
@@ -255,16 +284,15 @@ else:
         else:                return "important"
 
     def compter_relances_historique(client: str) -> int:
-        if not os.path.exists(HISTORIQUE_FILE):
+        """Compte les relances depuis Supabase pour ce client."""
+        try:
+            url = f"{SUPABASE_URL}/rest/v1/historique?user_email=eq.{utilisateur['email']}&client=eq.{client}&statut_envoi=eq.Envoye"
+            r = httpx.get(url, headers=supabase_headers())
+            if r.status_code == 200:
+                return len(r.json())
             return 0
-        df_hist = pd.read_excel(HISTORIQUE_FILE)
-        if df_hist.empty:
+        except:
             return 0
-        mask = (
-            (df_hist["Client"].astype(str) == str(client)) &
-            (df_hist["Statut Envoi"] == "Envoye")
-        )
-        return int(mask.sum())
 
     # ─── EXPORT PDF ──────────────────────────────────────────────
     def generer_pdf(email_text: str, row: pd.Series, niveau: int) -> bytes:
